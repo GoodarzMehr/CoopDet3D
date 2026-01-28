@@ -1,39 +1,133 @@
-FROM nvidia/cuda:11.3.1-devel-ubuntu20.04
+# MIT License
+#
+# Copyright (C) 2026 Goodarz Mehr
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to
+# deal in the Software without restriction, including without limitation the
+# rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+# sell copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+# FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+# IN THE SOFTWARE.
 
-RUN rm /etc/apt/sources.list.d/cuda.list
-RUN rm /etc/apt/sources.list.d/nvidia-ml.list
+# CoopDet3D Docker Configuration Script
+#
+# This script performs all the necessary steps for creating a CoopDet3D Docker
+# image.
+#
+# The base Docker image is Ubuntu 22.04 with CUDA 12.1. If you want to use a
+# different base image, you may need to modify "ubuntu2204/x86_64" when
+# fetching keys, based on your Ubuntu release and system architecture.
 
-RUN apt-get update && apt-get install wget -yq
-RUN apt-get install build-essential g++ gcc -y
-ENV DEBIAN_FRONTEND noninteractive
-RUN apt-get install libgl1-mesa-glx libglib2.0-0 -y
-RUN apt-get install openmpi-bin openmpi-common libopenmpi-dev libgtk2.0-dev git curl -y
+# Build Arguments (Case Sensitive):
+#
+# USER: username inside each container, set to "cd3d" by default.
 
-# Install miniconda
-ENV CONDA_DIR /opt/conda
-RUN wget --quiet https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O ~/miniconda.sh && \
-     /bin/bash ~/miniconda.sh -b -p /opt/conda
-# Put conda in path so we can use conda activate
-ENV PATH=$CONDA_DIR/bin:$PATH
-RUN conda install python=3.8
-RUN conda install pytorch==1.10.1 torchvision==0.11.2 torchaudio==0.10.1 cudatoolkit=11.3 -c pytorch
-RUN pip install Pillow==8.4.0
-RUN pip install tqdm
-RUN pip install torchpack
-RUN pip install mmcv==1.4.0 mmcv-full==1.4.0 mmdet==2.20.0
-RUN pip install nuscenes-devkit
-RUN pip install mpi4py==3.0.3
-RUN pip install numba==0.48.0
-RUN python -c "$(curl -fsSL https://raw.githubusercontent.com/mit-han-lab/torchsparse/master/install.py)"
-RUN pip install --upgrade numba
-RUN pip install --upgrade git+https://github.com/klintan/pypcd.git
-RUN pip install open3d
+# Installation:
+#
+# 1. Install Docker on your system (https://docs.docker.com/engine/install/).
+# 2. Install the Nvidia Container Toolkit
+# (https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html#installation-guide).
+# It exposes your Nvidia graphics card to Docker containers.
+# 3. Install the Nvidia Container Runtime and set it as the default runtime
+# (https://stackoverflow.com/questions/59691207/docker-build-with-nvidia-runtime).
+# 4. In the Dockerfile directory, run
+#
+# docker build --no-cache --rm --build-arg ARG -t coopdet3d:develop .
 
-################
-# add ros noetic
-################
-RUN pip install seaborn thop catkin_pkg empy rospkg
-RUN apt-get update && apt-get install -y --no-install-recommends cmake gnupg2 lsb-release ca-certificates
-RUN sh -c 'echo "deb http://packages.ros.org/ros/ubuntu $(lsb_release -sc) main" > /etc/apt/sources.list.d/ros-latest.list'
-RUN curl -s https://raw.githubusercontent.com/ros/rosdistro/master/ros.asc | apt-key add -
-RUN apt-get update && apt-get install -y --no-install-recommends zip htop screen libgl1-mesa-glx libpython3-dev python3-rosdep python3-rosinstall python3-rosinstall-generator python3-vcstool ros-noetic-ros-base ros-noetic-multisense-ros ros-noetic-uuid-msgs ros-noetic-vision-msgs
+# Usage:
+#
+# Launch a container by running
+#
+# docker run --privileged --gpus all --network=host -e DISPLAY=$DISPLAY
+# -v [path/to/CoopDet3D]:/home/coopdet3d
+# -v [path/to/dataset]:/dataset
+# --shm-size 32g -it coopdet3d:develop /bin/bash
+#
+# Use "nvidia-smi" to ensure your graphics card is visible inside the
+# container. Then, as the root user inside the "coopdet3d" directory, run
+#
+# python setup.py develop
+
+FROM nvidia/cuda:12.1.1-cudnn8-devel-ubuntu22.04
+
+# Define build arguments and environment variables.
+
+ARG USER=cd3d
+ENV USER=${USER}
+ENV TZ=America/New_York
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TORCH_CUDA_ARCH_LIST="Maxwell;Maxwell+Tegra;Pascal;Volta;Turing;Ampere;Ada;Hopper"
+ENV WITH_CUDA=1
+ENV USE_CUDA=1
+ENV USE_CUDNN=1
+
+# Add new user and install prerequisite packages.
+
+WORKDIR /home
+
+RUN useradd -m ${USER}
+
+RUN set -xue && apt-key del 7fa2af80 \
+&& apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/3bf863cc.pub \
+&& apt update \
+&& apt install -y build-essential cmake debhelper git wget libsdl2-2.0-0 libsm6 libgl1-mesa-glx libomp5 pip unzip \
+libjpeg8 libtiff5 software-properties-common nano fontconfig g++ gcc libglib2.0-0 openmpi-bin openmpi-common \
+libopenmpi-dev libjpeg-dev libgtk2.0-dev libnvidia-gl-580 libnvidia-common-580 libnvidia-compute-580 python-is-python3
+
+RUN pip install --no-cache-dir torch==1.10.1+cu113 torchvision==0.11.2+cu113 torchaudio==0.10.1 pillow==8.4.0 \
+mmcv==1.4.0 mmcv-full==1.4.0 mmdet==2.20.0 mpi4py==3.0.3 numba==0.48.0 numpy==1.23.5 cmake==3.22.6 future==0.18.2 \
+yapf==0.40.1 mkl==2022.1.0 mkl-include==2022.1.0 astunparse nuscenes-devkit tqdm torchpack matplotlib opencv-python \
+open3d ninja dataclasses -f https://download.pytorch.org/whl/torch_stable.html
+
+# Uninstall MMCV and PyTorch.
+
+RUN pip uninstall mmcv mmcv-full -y
+RUN pip uninstall torch torchvision torchaudio -y
+
+# Build and install PyTorch from source.
+
+WORKDIR /opt
+
+RUN git clone --recursive --branch pytorch-from-1.11.0-cuda-12.1 https://github.com/GoodarzMehr/pytorch.git
+
+WORKDIR /opt/pytorch
+
+ENV CMAKE_PREFIX_PATH="$(dirname $(which python3))/../share/cmake"
+
+RUN FORCE_CUDA=1 python setup.py install
+RUN FORCE_CUDA=1 python setup.py develop
+
+WORKDIR /opt
+
+# Build and install TorchVision from source.
+
+RUN git clone --recursive --branch v0.12.0 https://github.com/pytorch/vision.git
+
+WORKDIR /opt/vision
+
+RUN FORCE_CUDA=1 python setup.py install
+RUN FORCE_CUDA=1 python setup.py develop
+
+WORKDIR /home
+
+# Install MMCV.
+
+RUN MMCV_WITH_OPS=1 FORCE_CUDA=1 pip install \
+--no-cache-dir "git+https://github.com/GoodarzMehr/mmcv.git@bevfusion-from-1.4.0"
+
+# Install PyTorch3D.
+
+RUN FORCE_CUDA=1 pip install --no-cache-dir "git+https://github.com/facebookresearch/pytorch3d.git@v0.7.4"
+
+USER ${USER}
