@@ -2,7 +2,7 @@ dataset_type: TUMTrafV2XNuscDataset
 #dataset_root: data/tumtraf_processed/
 # TODO: for inference change dataset root
 # NOTE: there should be a slash in the end of the folder path
-dataset_root: data/tumtraf_v2x_cooperative_perception_dataset_processed/
+dataset_root: /home/data/tumtraf_v2x_cooperative_perception_dataset_processed/
 gt_paste_stop_epoch: -1
 reduce_beams: 32
 load_dim: 5
@@ -329,7 +329,7 @@ test_pipeline:
       - vehicle2infrastructure
 
 data:
-  samples_per_gpu: 4
+  samples_per_gpu: 16
   workers_per_gpu: 4
   train:
     type: CBGSDataset

@@ -67,10 +67,12 @@ ARG USER=cd3d
 ENV USER=${USER}
 ENV TZ=America/New_York
 ENV DEBIAN_FRONTEND=noninteractive
-ENV TORCH_CUDA_ARCH_LIST="Maxwell;Maxwell+Tegra;Pascal;Volta;Turing;Ampere;Ada;Hopper"
+ENV TORCH_CUDA_ARCH_LIST="Volta;Turing;Ampere;Ada;Hopper"
 ENV WITH_CUDA=1
 ENV USE_CUDA=1
 ENV USE_CUDNN=1
+ENV RDMAV_FORK_SAFE=1
+ENV USE_BREAKPAD=0
 
 # Add new user and install prerequisite packages.
 
@@ -83,12 +85,13 @@ RUN set -xue && apt-key del 7fa2af80 \
 && apt update \
 && apt install -y build-essential cmake debhelper git wget libsdl2-2.0-0 libsm6 libgl1-mesa-glx libomp5 pip unzip \
 libjpeg8 libtiff5 software-properties-common nano fontconfig g++ gcc libglib2.0-0 openmpi-bin openmpi-common \
-libopenmpi-dev libjpeg-dev libgtk2.0-dev libnvidia-gl-580 libnvidia-common-580 libnvidia-compute-580 python-is-python3
+libopenmpi-dev libjpeg-dev libgtk2.0-dev python-is-python3 libsparsehash-dev libnvidia-gl-580=580.95.05-0ubuntu1 libnvidia-common-580=580.95.05-0ubuntu1 \
+libnvidia-compute-580=580.95.05-0ubuntu1 libnvidia-decode-580=580.95.05-0ubuntu1 libnvidia-cfg1-580=580.95.05-0ubuntu1 libnvidia-gpucomp-580=580.95.05-0ubuntu1
 
-RUN pip install --no-cache-dir torch==1.10.1+cu113 torchvision==0.11.2+cu113 torchaudio==0.10.1 pillow==8.4.0 \
-mmcv==1.4.0 mmcv-full==1.4.0 mmdet==2.20.0 mpi4py==3.0.3 numba==0.48.0 numpy==1.23.5 cmake==3.22.6 future==0.18.2 \
-yapf==0.40.1 mkl==2022.1.0 mkl-include==2022.1.0 astunparse nuscenes-devkit tqdm torchpack matplotlib opencv-python \
-open3d ninja dataclasses -f https://download.pytorch.org/whl/torch_stable.html
+RUN pip install --no-cache-dir torch==1.11.0+cu113 torchvision==0.12.0+cu113 torchaudio==0.11.0 pillow==8.4.0 \
+mmcv==1.4.0 mmcv-full==1.4.0 mmdet==2.20.0 mpi4py==3.1.3 numba==0.56.4 numpy==1.23.5 cmake==3.22.6 future==0.18.2 \
+yapf==0.40.1 mkl==2022.1.0 mkl-include==2022.1.0 llvmlite==0.39.1 astunparse nuscenes-devkit tqdm \
+torchpack matplotlib opencv-python open3d ninja dataclasses -f https://download.pytorch.org/whl/torch_stable.html
 
 # Uninstall MMCV and PyTorch.
 
@@ -129,5 +132,13 @@ RUN MMCV_WITH_OPS=1 FORCE_CUDA=1 pip install \
 # Install PyTorch3D.
 
 RUN FORCE_CUDA=1 pip install --no-cache-dir "git+https://github.com/facebookresearch/pytorch3d.git@v0.7.4"
+
+# Install PyPCD.
+
+RUN FORCE_CUDA=1 pip install --upgrade --no-cache-dir "git+https://github.com/klintan/pypcd.git"
+
+# Install TorchSparse.
+
+RUN FORCE_CUDA=1 pip install --no-cache-dir "git+https://github.com/mit-han-lab/torchsparse.git"
 
 USER ${USER}
